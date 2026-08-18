@@ -34,6 +34,7 @@ import androidx.media3.common.Metadata;
 import androidx.media3.exoplayer.metadata.MetadataOutput;
 import androidx.media3.extractor.metadata.icy.IcyHeaders;
 import androidx.media3.extractor.metadata.icy.IcyInfo;
+import androidx.media3.extractor.metadata.id3.TextInformationFrame;
 import androidx.media3.exoplayer.source.ClippingMediaSource; // Deprecated
 // For some reason, this import triggers the [deprecation] warning, despite the
 // warnings being suppressed at each use.
@@ -92,6 +93,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     private Result seekResult;
     private Map<String, MediaSource> mediaSources = new HashMap<String, MediaSource>();
     private IcyInfo icyInfo;
+    private String id3Title;
     private IcyHeaders icyHeaders;
     private AudioAttributes pendingAudioAttributes;
     private LoadControl loadControl;
@@ -248,6 +250,15 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
             if (entry instanceof IcyInfo) {
                 icyInfo = (IcyInfo) entry;
                 broadcastImmediatePlaybackEvent();
+            } else if (entry instanceof TextInformationFrame) {
+                // ID3 in HLS segments: the extractor delivers this at the
+                // playback time of the segment it was attached to, which is
+                // what makes it usable for syncing a display to the audio.
+                final TextInformationFrame frame = (TextInformationFrame) entry;
+                if ("TIT2".equals(frame.id) && !frame.values.isEmpty()) {
+                    id3Title = frame.values.get(0);
+                    broadcastImmediatePlaybackEvent();
+                }
             }
         }
     }
@@ -863,6 +874,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         event.put("updateTime", updateTime);
         event.put("bufferedPosition", 1000 * Math.max(updatePosition, bufferedPosition));
         event.put("icyMetadata", collectIcyMetadata());
+        event.put("id3Title", id3Title);
         event.put("duration", duration);
         event.put("currentIndex", currentIndex);
         event.put("androidAudioSessionId", audioSessionId);

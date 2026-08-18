@@ -533,6 +533,14 @@ class AudioPlayer {
   Stream<IcyMetadata?> get icyMetadataStream =>
       _icyMetadataSubject.stream.distinct();
 
+  /// Non-empty in-band ID3 titles, in playback order. Distinct: the tag is
+  /// repeated in every segment, so consumers would otherwise see one event
+  /// per segment for the same track.
+  Stream<String> get id3TitleStream => playbackEventStream
+      .map((event) => event.id3Title)
+      .whereType<String>()
+      .distinct();
+
   /// The current player state containing only the processing and playing
   /// states.
   PlayerState get playerState =>
@@ -1578,6 +1586,7 @@ class AudioPlayer {
           icyMetadata: message.icyMetadata == null
               ? null
               : IcyMetadata._fromMessage(message.icyMetadata!),
+          id3Title: message.id3Title,
           currentIndex: index,
           androidAudioSessionId: message.androidAudioSessionId,
           errorCode: message.errorCode,
@@ -1908,6 +1917,10 @@ class PlaybackEvent {
   /// The latest ICY metadata received through the audio stream if available.
   final IcyMetadata? icyMetadata;
 
+  /// The most recent ID3 TIT2 (title) frame delivered in-band, at the playback
+  /// time of the segment carrying it. Android/HLS only; null elsewhere.
+  final String? id3Title;
+
   /// The index of the currently playing item, or `null` if no item is selected.
   // TODO: Consider introducing currentAudioSourceId
   final int? currentIndex;
@@ -1934,6 +1947,7 @@ class PlaybackEvent {
     this.bufferedPosition = Duration.zero,
     this.duration,
     this.icyMetadata,
+    this.id3Title,
     this.currentIndex,
     this.androidAudioSessionId,
     this.errorCode,
@@ -1948,6 +1962,7 @@ class PlaybackEvent {
     Duration? bufferedPosition,
     Duration? duration,
     IcyMetadata? icyMetadata,
+    String? id3Title,
     int? currentIndex,
     int? androidAudioSessionId,
     int? errorCode,
@@ -1960,6 +1975,7 @@ class PlaybackEvent {
         bufferedPosition: bufferedPosition ?? this.bufferedPosition,
         duration: duration ?? this.duration,
         icyMetadata: icyMetadata ?? this.icyMetadata,
+        id3Title: id3Title ?? this.id3Title,
         currentIndex: currentIndex ?? this.currentIndex,
         androidAudioSessionId:
             androidAudioSessionId ?? this.androidAudioSessionId,
@@ -1975,6 +1991,7 @@ class PlaybackEvent {
         bufferedPosition,
         duration,
         icyMetadata,
+        id3Title,
         currentIndex,
         androidAudioSessionId,
         errorCode,
@@ -1991,6 +2008,7 @@ class PlaybackEvent {
       bufferedPosition == other.bufferedPosition &&
       duration == other.duration &&
       icyMetadata == other.icyMetadata &&
+      id3Title == other.id3Title &&
       currentIndex == other.currentIndex &&
       androidAudioSessionId == other.androidAudioSessionId &&
       errorCode == other.errorCode &&
