@@ -256,8 +256,14 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                 // what makes it usable for syncing a display to the audio.
                 final TextInformationFrame frame = (TextInformationFrame) entry;
                 if ("TIT2".equals(frame.id) && !frame.values.isEmpty()) {
-                    id3Title = frame.values.get(0);
-                    broadcastImmediatePlaybackEvent();
+                    final String newTitle = frame.values.get(0);
+                    // Every segment repeats the tag; only broadcast on an actual
+                    // change or NovaAudioHandler turns this into a media-session
+                    // update every ~6s for the whole session.
+                    if (!newTitle.equals(id3Title)) {
+                        id3Title = newTitle;
+                        broadcastImmediatePlaybackEvent();
+                    }
                 }
             }
         }
@@ -762,6 +768,10 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
 
     private void load(final List<MediaSource> mediaSources, ShuffleOrder shuffleOrder, final long initialPosition, final Integer initialIndex, final Result result) {
         currentIndex = initialIndex != null ? initialIndex : 0;
+        // The engine is shared with the offline player; without this an offline
+        // track's title can leak into the first playback event of a new (live)
+        // source.
+        id3Title = null;
         switch (processingState) {
         case idle:
             break;
